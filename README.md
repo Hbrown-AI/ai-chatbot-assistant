@@ -1,6 +1,6 @@
 # 🤖 ILMAP Chatbot MVP
 
-Questo è un MVP per un chatbot aziendale che risponde a domande su prodotti, certificazioni e servizi ILMAP, sfruttando l'Assistant API di OpenAI e un vector store contenente documentazione aziendale.
+Questo è un MVP per un chatbot aziendale che risponde a domande su prodotti, certificazioni e servizi della [AZIENDA], sfruttando l'Assistant API di OpenAI e un vector store contenente documentazione aziendale.
 
 ## 🚀 Funzionalità
 
