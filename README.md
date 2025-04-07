@@ -21,8 +21,7 @@ cd ilmap-chatbot-mvp
 pip install -r requirements.txt
 ```
 
-3. Crea un file `.env` basato su `.env.example`:
-```env
+3. USA nella sezione secrets:
 OPENAI_API_KEY=sk-...
 ASSISTANT_ID=asst-...
 ```
