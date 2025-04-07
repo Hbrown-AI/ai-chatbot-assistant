@@ -1,14 +1,11 @@
 # app.py
 import streamlit as st
 import openai
-import os
-from dotenv import load_dotenv
 import time
 
-# Carica variabili d'ambiente dal file .env
-load_dotenv()
-openai.api_key = os.getenv("OPENAI_API_KEY")
-assistant_id = os.getenv("ASSISTANT_ID")
+# Legge le chiavi API da Streamlit Secrets
+openai.api_key = st.secrets["OPENAI_API_KEY"]
+assistant_id = st.secrets["ASSISTANT_ID"]
 
 st.set_page_config(page_title="ILMAP Chatbot", page_icon="🤖")
 st.title("💬 Chatbot ILMAP")
