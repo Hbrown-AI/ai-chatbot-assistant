@@ -12,7 +12,11 @@ from datetime import datetime
 st.set_page_config(page_title="Chatbot Assistente Aziendale")
 
 # === LOGO E TITOLO ===
-st.markdown("<div style='text-align:center'><img src='logo.png' width='200'/></div>", unsafe_allow_html=True)
+try:
+    st.image("logo.png", width=200)
+except:
+    st.warning("⚠️ Impossibile caricare il logo. Verifica che 'image.png' sia caricato nei file dell'app.")
+
 st.markdown("<h1 style='text-align: center; margin-bottom: 0;'>Chatbot Assistente Aziendale</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center;'>Richiedi informazioni su prodotti, servizi o documentazione tecnica aziendale.</p>", unsafe_allow_html=True)
 
@@ -24,18 +28,17 @@ if "feedback_given" not in st.session_state:
 
 # === MOSTRA MESSAGGI DELLA CHAT ===
 for msg in st.session_state.chat_history:
-    with st.chat_message(msg["role"], avatar="IL" if msg["role"] == "assistant" else None):
+    with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
 # === INPUT UTENTE ===
 user_input = st.chat_input("Scrivi la tua richiesta...")
 
 if user_input:
-    # Mostra messaggio utente
     st.chat_message("user").markdown(user_input)
     st.session_state.chat_history.append({"role": "user", "content": user_input})
 
-    with st.chat_message("assistant", avatar="IL"):
+    with st.chat_message("assistant"):
         with st.spinner("Sto cercando la risposta..."):
             try:
                 openai.api_key = st.secrets["OPENAI_API_KEY"]
@@ -60,7 +63,7 @@ if user_input:
                 st.session_state.last_user_input = user_input
                 st.session_state.last_ai_response = ai_response
 
-                # Salva automaticamente richiesta e risposta
+                # Salvataggio automatico su Google Sheets
                 try:
                     def salva_interazione(messaggio, risposta):
                         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
@@ -99,7 +102,7 @@ if "last_ai_response" in st.session_state and not st.session_state.feedback_give
                 client = gspread.authorize(creds)
                 sheet = client.open("Chatbot assistente aziendale").worksheet("Foglio1")
                 records = sheet.get_all_records()
-                idx = len(records) + 2  # header + 1-based index
+                idx = len(records) + 2
                 sheet.update(f"D{idx}", [[rating]])
                 sheet.update(f"E{idx}", [[comment]])
 
