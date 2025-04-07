@@ -12,7 +12,7 @@ import json
 st.set_page_config(page_title="Chatbot Assistente Aziendale", page_icon="🤖", layout="centered")
 
 # === LOGO AZIENDALE ===
-st.image("image.png", width=100)
+st.image("logo.png", width=100)
 
 # === HEADER CENTRALE CON TITOLO ===
 st.markdown("<h1 style='text-align: center;'>🤖 Chatbot Assistente Aziendale</h1>", unsafe_allow_html=True)
