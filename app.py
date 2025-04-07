@@ -9,49 +9,38 @@ from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
 
 # === CONFIG ===
-st.set_page_config(page_title="Chatbot Assistente Aziendale", page_icon="🤖")
+st.set_page_config(page_title="Chatbot Assistente Aziendale")
 
 # === LOGO E TITOLO ===
-st.image("logo.png", width=200)
-st.markdown("<h1 style='text-align: center;'>🤖 Chatbot Assistente Aziendale</h1>", unsafe_allow_html=True)
+st.markdown("<div style='text-align:center'><img src='logo.png' width='200'/></div>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center; margin-bottom: 0;'>Chatbot Assistente Aziendale</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;'>Richiedi informazioni su prodotti, servizi o documentazione tecnica aziendale.</p>", unsafe_allow_html=True)
 
-# === MESSAGGIO DI BENVENUTO (UNA TANTUM) ===
+# === STATO INIZIALE ===
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
-    st.session_state.welcome_shown = False
+if "feedback_given" not in st.session_state:
+    st.session_state.feedback_given = False
 
-if not st.session_state.welcome_shown:
-    with st.chat_message("assistant"):
-        st.markdown("""
-👋 Ciao! Sono il tuo assistente aziendale.
-
-Posso aiutarti a reperire rapidamente informazioni su **prodotti, servizi, certificazioni** e altri aspetti dell’azienda.
-
-Scrivi qui sotto la tua richiesta e ti risponderò in modo chiaro e dettagliato.
-""")
-    st.session_state.welcome_shown = True
-
-# === GESTIONE CHAT CONVERSAZIONALE ===
+# === MOSTRA MESSAGGI DELLA CHAT ===
 for msg in st.session_state.chat_history:
-    with st.chat_message(msg["role"]):
+    with st.chat_message(msg["role"], avatar="IL" if msg["role"] == "assistant" else None):
         st.markdown(msg["content"])
 
 # === INPUT UTENTE ===
 user_input = st.chat_input("Scrivi la tua richiesta...")
 
 if user_input:
+    # Mostra messaggio utente
+    st.chat_message("user").markdown(user_input)
     st.session_state.chat_history.append({"role": "user", "content": user_input})
-    with st.chat_message("user"):
-        st.markdown(user_input)
 
-    with st.chat_message("assistant"):
+    with st.chat_message("assistant", avatar="IL"):
         with st.spinner("Sto cercando la risposta..."):
             try:
-                # OpenAI credentials
                 openai.api_key = st.secrets["OPENAI_API_KEY"]
                 assistant_id = st.secrets["ASSISTANT_ID"]
 
-                # Assistant call
                 thread = openai.beta.threads.create()
                 openai.beta.threads.messages.create(thread_id=thread.id, role="user", content=user_input)
                 run = openai.beta.threads.runs.create(thread_id=thread.id, assistant_id=assistant_id)
@@ -71,11 +60,30 @@ if user_input:
                 st.session_state.last_user_input = user_input
                 st.session_state.last_ai_response = ai_response
 
-            except Exception as e:
-                st.error(f"Errore: {e}")
+                # Salva automaticamente richiesta e risposta
+                try:
+                    def salva_interazione(messaggio, risposta):
+                        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+                        creds_dict = json.loads(st.secrets["GOOGLE_CREDENTIALS"])
+                        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+                        client = gspread.authorize(creds)
+                        sheet = client.open("Chatbot assistente aziendale").worksheet("Foglio1")
+                        sheet.append_row([
+                            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                            messaggio,
+                            risposta,
+                            "",  # valutazione
+                            ""   # commento
+                        ])
+                    salva_interazione(user_input, ai_response)
+                except Exception as e:
+                    st.warning(f"⚠️ Interazione non salvata su Google Sheet: {e}")
 
-# === FEEDBACK POST-RISPOSTA ===
-if "last_ai_response" in st.session_state:
+            except Exception as e:
+                st.error(f"Errore durante la risposta: {e}")
+
+# === BLOCCO FEEDBACK SEMPRE IN FONDO ===
+if "last_ai_response" in st.session_state and not st.session_state.feedback_given:
     st.divider()
     st.subheader("💬 Lascia un feedback")
 
@@ -84,29 +92,19 @@ if "last_ai_response" in st.session_state:
 
     if st.button("✅ Invia feedback"):
         try:
-            def salva_feedback(messaggio, risposta, valutazione, commento):
+            def aggiorna_feedback(valutazione, commento):
                 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-                creds_dict = json.loads(st.secrets["GCP_SERVICE_ACCOUNT"])
+                creds_dict = json.loads(st.secrets["GOOGLE_CREDENTIALS"])
                 creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
                 client = gspread.authorize(creds)
                 sheet = client.open("Chatbot assistente aziendale").worksheet("Foglio1")
-                nuova_riga = [
-                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                    messaggio,
-                    risposta,
-                    valutazione,
-                    commento
-                ]
-                sheet.append_row(nuova_riga)
+                records = sheet.get_all_records()
+                idx = len(records) + 2  # header + 1-based index
+                sheet.update(f"D{idx}", [[rating]])
+                sheet.update(f"E{idx}", [[comment]])
 
-            salva_feedback(
-                st.session_state.last_user_input,
-                st.session_state.last_ai_response,
-                rating,
-                comment
-            )
+            aggiorna_feedback(rating, comment)
             st.success("🎉 Feedback registrato con successo!")
-            del st.session_state.last_user_input
-            del st.session_state.last_ai_response
+            st.session_state.feedback_given = True
         except Exception as e:
             st.error(f"Errore durante il salvataggio del feedback: {e}")
