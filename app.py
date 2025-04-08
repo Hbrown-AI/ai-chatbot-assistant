@@ -1,113 +1,86 @@
 
 import streamlit as st
 import openai
-import time
-import json
-import re
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
+import base64
+import os
 from datetime import datetime
+from dotenv import load_dotenv
 
-# === CONFIG ===
-st.set_page_config(page_title="Chatbot Assistente Aziendale")
+# Carica le variabili d'ambiente da secrets
+openai.api_key = st.secrets["OPENAI_API_KEY"]
+GOOGLE_SHEET_ID = st.secrets["GOOGLE_SHEET_ID"]
+GOOGLE_CREDENTIALS = st.secrets["GOOGLE_CREDENTIALS"]
 
-# === LOGO E TITOLO ===
-try:
-    st.image("logo.png", width=200)
-except:
-    st.warning("⚠️ Impossibile caricare il logo. Verifica che 'image.png' sia caricato nei file dell'app.")
+# Configura la pagina
+st.set_page_config(page_title="AI Mail Assistant", layout="wide")
 
-st.markdown("<h1 style='text-align: center; margin-bottom: 0;'>Chatbot Assistente Aziendale</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center;'>Richiedi informazioni su prodotti, servizi o documentazione tecnica aziendale.</p>", unsafe_allow_html=True)
+# Logo in alto
+st.image("logo.png", width=150)
 
-# === STATO INIZIALE ===
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
-if "feedback_given" not in st.session_state:
-    st.session_state.feedback_given = False
+# Titolo centrale
+st.markdown("<h1 style='text-align: center;'>📩 AI Mail Assistant</h1>", unsafe_allow_html=True)
 
-# === MOSTRA MESSAGGI DELLA CHAT ===
-for msg in st.session_state.chat_history:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
+# Colonne per layout side-by-side
+col1, col2 = st.columns(2)
 
-# === INPUT UTENTE ===
-user_input = st.chat_input("Scrivi la tua richiesta...")
+with col1:
+    st.markdown("### 📨 Nuova Analisi")
+    st.write("Incolla il contenuto dell'email o carica un file per iniziare l'analisi.")
+    
+    input_text = st.text_area("✍️ Inserisci qui il contenuto dell'email", height=250, label_visibility="collapsed")
+    uploaded_files = st.file_uploader("📎 Oppure carica uno o più file", type=["pdf", "docx", "xlsx", "eml", "txt"], accept_multiple_files=True)
 
-if user_input:
-    st.chat_message("user").markdown(user_input)
-    st.session_state.chat_history.append({"role": "user", "content": user_input})
+    analyze_button = st.button("🔍 Nuova Analisi")
 
-    with st.chat_message("assistant"):
-        with st.spinner("Sto cercando la risposta..."):
-            try:
-                openai.api_key = st.secrets["OPENAI_API_KEY"]
-                assistant_id = st.secrets["ASSISTANT_ID"]
+with col2:
+    st.markdown("### 🧠 Risultato")
+    output_placeholder = st.empty()
 
-                thread = openai.beta.threads.create()
-                openai.beta.threads.messages.create(thread_id=thread.id, role="user", content=user_input)
-                run = openai.beta.threads.runs.create(thread_id=thread.id, assistant_id=assistant_id)
+# Analisi
+if analyze_button:
+    full_input = input_text.strip()
+    if not full_input and not uploaded_files:
+        st.warning("⚠️ Inserisci del testo o carica almeno un file.")
+    else:
+        if uploaded_files:
+            for file in uploaded_files:
+                file_text = file.read().decode("utf-8", errors="ignore")
+                full_input += "\n" + file_text
 
-                while True:
-                    run_status = openai.beta.threads.runs.retrieve(thread_id=thread.id, run_id=run.id)
-                    if run_status.status == "completed":
-                        break
-                    time.sleep(1)
+        with st.spinner("Analisi in corso..."):
+            with open("prompt_template.txt", "r") as file:
+                prompt_template = file.read()
+            prompt = f"{prompt_template}\n\nEmail da analizzare:\n{full_input}"
+            response = openai.chat.completions.create(
+                model="gpt-4-1106-preview",
+                messages=[
+                    {"role": "system", "content": "Sei un assistente utile e professionale."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.4,
+                max_tokens=2048
+            )
+            result = response.choices[0].message.content
+            output_placeholder.text_area("🧠 Risultato", result, height=250)
 
-                messages = openai.beta.threads.messages.list(thread_id=thread.id)
-                raw_response = messages.data[0].content[0].text.value
-                ai_response = re.sub(r"【\d+:\d+†source】", "", raw_response)
+            # Download
+            b64 = base64.b64encode(result.encode()).decode()
+            href = f'<a href="data:file/txt;base64,{b64}" download="risultato_ai.txt">📄 Scarica il risultato</a>'
+            st.markdown(href, unsafe_allow_html=True)
 
-                st.markdown(ai_response)
-                st.session_state.chat_history.append({"role": "assistant", "content": ai_response})
-                st.session_state.last_user_input = user_input
-                st.session_state.last_ai_response = ai_response
+            # Feedback
+            st.markdown("### ⭐ Lascia un feedback")
+            feedback = st.slider("Valuta il risultato da 1 a 5", 1, 5, 3)
+            comment = st.text_input("💬 Hai suggerimenti o commenti?")
 
-                # Salvataggio automatico su Google Sheets
-                try:
-                    def salva_interazione(messaggio, risposta):
-                        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-                        creds_dict = json.loads(st.secrets["GOOGLE_CREDENTIALS"])
-                        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-                        client = gspread.authorize(creds)
-                        sheet = client.open("Chatbot assistente aziendale").worksheet("Foglio1")
-                        sheet.append_row([
-                            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                            messaggio,
-                            risposta,
-                            "",  # valutazione
-                            ""   # commento
-                        ])
-                    salva_interazione(user_input, ai_response)
-                except Exception as e:
-                    st.warning(f"⚠️ Interazione non salvata su Google Sheet: {e}")
+            if st.button("📤 Invia feedback"):
+                from google.oauth2.service_account import Credentials
+                import gspread
 
-            except Exception as e:
-                st.error(f"Errore durante la risposta: {e}")
+                credentials = Credentials.from_service_account_info(eval(GOOGLE_CREDENTIALS))
+                client = gspread.authorize(credentials)
+                sheet = client.open_by_key(GOOGLE_SHEET_ID).sheet1
 
-# === BLOCCO FEEDBACK SEMPRE IN FONDO ===
-if "last_ai_response" in st.session_state and not st.session_state.feedback_given:
-    st.divider()
-    st.subheader("💬 Lascia un feedback")
-
-    rating = st.slider("Quanto sei soddisfatto della risposta?", 1, 5, 3)
-    comment = st.text_area("Hai commenti o suggerimenti?")
-
-    if st.button("✅ Invia feedback"):
-        try:
-            def aggiorna_feedback(valutazione, commento):
-                scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-                creds_dict = json.loads(st.secrets["GOOGLE_CREDENTIALS"])
-                creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-                client = gspread.authorize(creds)
-                sheet = client.open("Chatbot assistente aziendale").worksheet("Foglio1")
-                records = sheet.get_all_records()
-                idx = len(records) + 2
-                sheet.update(f"D{idx}", [[rating]])
-                sheet.update(f"E{idx}", [[comment]])
-
-            aggiorna_feedback(rating, comment)
-            st.success("🎉 Feedback registrato con successo!")
-            st.session_state.feedback_given = True
-        except Exception as e:
-            st.error(f"Errore durante il salvataggio del feedback: {e}")
+                now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                sheet.append_row([now, full_input, result, feedback, comment])
+                st.success("✅ Feedback salvato con successo!")
