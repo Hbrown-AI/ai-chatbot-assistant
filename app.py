@@ -18,7 +18,7 @@ except:
     st.warning("⚠️ Impossibile caricare il logo. Verifica che 'image.png' sia caricato nei file dell'app.")
 
 st.markdown("<h1 style='text-align: center; margin-bottom: 0;'>Assistente Aziendale</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center;'>Richiedi informazioni su prodotti, servizi o documentazione tecnica aziendale.</p>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center;'>Questo assistente consente di ottenere rapidamente informazioni tecniche e commerciali disponibili nella documentazione aziendale pubblica. È utile sia per clienti interessati a conoscere meglio l’azienda, sia per il personale interno che ha bisogno di accedere a risorse tecniche.</p>", unsafe_allow_html=True)
 
 # === STATO INIZIALE ===
 if "chat_history" not in st.session_state:
