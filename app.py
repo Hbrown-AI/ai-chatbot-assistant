@@ -17,7 +17,7 @@ try:
 except:
     st.warning("⚠️ Impossibile caricare il logo. Verifica che 'image.png' sia caricato nei file dell'app.")
 
-st.markdown("<h1 style='text-align: center; margin-bottom: 0;'>Chatbot Assistente Aziendale</h1>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center; margin-bottom: 0;'>Assistente Aziendale</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center;'>Richiedi informazioni su prodotti, servizi o documentazione tecnica aziendale.</p>", unsafe_allow_html=True)
 
 # === STATO INIZIALE ===
