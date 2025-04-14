@@ -9,7 +9,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
 
 # === CONFIG ===
-st.set_page_config(page_title="Chatbot Assistente Aziendale")
+st.set_page_config(page_title="Assistente Aziendale")
 
 # === LOGO E TITOLO ===
 try:
